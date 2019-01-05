@@ -1,7 +1,9 @@
-pkgbase=linux-surface-dev
-_srcver=4.20.18-surface-dev
+_basever=4.18.20
+_extraver=-surface-dev
 pkgrel=1
 
+pkgbase=linux-surface-dev
+_srcver="${_basever}${_extraver}"
 pkgver=${_srcver//-/.}
 arch=(x86_64)
 license=(GPL2)
@@ -27,7 +29,8 @@ _kernelname=${pkgbase#linux}
 : ${_kernelname:=-ARCH}
 
 build() {
-  make -C ${_srcname} -s kernelrelease > version
+  echo "$_srcver" > version
+  echo "$_extraver" > ${_srcname}/.scmversion
   msg2 "Prepared %s version %s" "$pkgbase" "$(<version)"
 
   make -C ${_srcname} bzImage modules htmldocs
@@ -44,22 +47,20 @@ _package() {
   local kernver="$(<version)"
   local modulesdir="$pkgdir/usr/lib/modules/$kernver"
 
-  cd ${_srcname}
-
   msg2 "Installing boot image..."
   # systemd expects to find the kernel here to allow hibernation
   # https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
-  install -Dm644 "$(make -s image_name)" "$modulesdir/vmlinuz"
+  install -Dm644 "${_srcname}/$(make -C ${_srcname} -s image_name)" "$modulesdir/vmlinuz"
   install -Dm644 "$modulesdir/vmlinuz" "$pkgdir/boot/vmlinuz-$pkgbase"
 
   msg2 "Installing modules..."
-  make INSTALL_MOD_PATH="$pkgdir/usr" modules_install
+  make -C ${_srcname} INSTALL_MOD_PATH="$pkgdir/usr" modules_install
 
   # a place for external modules,
   # with version file for building modules and running depmod from hook
   local extramodules="extramodules$_kernelname"
   local extradir="$pkgdir/usr/lib/modules/$extramodules"
-  install -Dt "$extradir" -m644 ../version
+  install -Dt "$extradir" -m644 version
   ln -sr "$extradir" "$modulesdir/extramodules"
 
   # remove build and source links

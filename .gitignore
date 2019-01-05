@@ -1,2 +1,4 @@
 pkg
 out
+src/linux
+src/version
