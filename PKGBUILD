@@ -1,5 +1,5 @@
-pkgbase=linux-surface
-_srcver=4.20.18-surface
+pkgbase=linux-surface-dev
+_srcver=4.20.18-surface-dev
 pkgrel=1
 
 pkgver=${_srcver//-/.}
