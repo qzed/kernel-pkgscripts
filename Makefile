@@ -1,6 +1,6 @@
 NPROC=24
 
-.phony: all
+.PHONY: all clean clean-kbuild
 
 all:
 	MAKEFLAGS="-j${NPROC}" makepkg -ef
