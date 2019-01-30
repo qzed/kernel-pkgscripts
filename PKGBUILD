@@ -1,4 +1,4 @@
-_basever=4.18.20
+_basever=4.19.18
 _extraver=-surface-dev
 pkgrel=1
 
