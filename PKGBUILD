@@ -1,4 +1,4 @@
-_basever=4.19.18
+_basever=5.0.9
 _extraver=-surface-dev
 pkgrel=1
 
@@ -7,7 +7,7 @@ _srcver="${_basever}${_extraver}"
 pkgver=${_srcver//-/.}
 arch=(x86_64)
 license=(GPL2)
-makedepends=(xmlto kmod inetutils bc libelf git python-sphinx graphviz)
+makedepends=(xmlto kmod inetutils bc libelf git)
 options=('!strip')
 _srcname=linux
 source=(
@@ -33,7 +33,7 @@ build() {
   echo "$_extraver" > ${_srcname}/.scmversion
   msg2 "Prepared %s version %s" "$pkgbase" "$(<version)"
 
-  make -C ${_srcname} bzImage modules htmldocs
+  make -C ${_srcname} bzImage modules
 }
 
 _package() {
@@ -181,18 +181,6 @@ _package-docs() {
   msg2 "Installing documentation..."
   mkdir -p "$builddir"
   cp -t "$builddir" -a Documentation
-
-  msg2 "Removing doctrees..."
-  rm -r "$builddir/Documentation/output/.doctrees"
-
-  msg2 "Moving HTML docs..."
-  local src dst
-  while read -rd '' src; do
-    dst="$builddir/Documentation/${src#$builddir/Documentation/output/}"
-    mkdir -p "${dst%/*}"
-    mv "$src" "$dst"
-    rmdir -p --ignore-fail-on-non-empty "${src%/*}"
-  done < <(find "$builddir/Documentation/output" -type f -print0)
 
   msg2 "Adding symlink..."
   mkdir -p "$pkgdir/usr/share/doc"
