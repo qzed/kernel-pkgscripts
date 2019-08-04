@@ -1,4 +1,4 @@
-_basever=5.0.9
+_basever=5.2.5
 _extraver=-surface-dev
 pkgrel=1
 
@@ -30,10 +30,9 @@ _kernelname=${pkgbase#linux}
 
 build() {
   echo "$_srcver" > version
-  echo "$_extraver" > ${_srcname}/.scmversion
   msg2 "Prepared %s version %s" "$pkgbase" "$(<version)"
 
-  make -C ${_srcname} bzImage modules
+  make LOCALVERSION="${_extraver}" -C ${_srcname} bzImage modules
 }
 
 _package() {
@@ -50,11 +49,11 @@ _package() {
   msg2 "Installing boot image..."
   # systemd expects to find the kernel here to allow hibernation
   # https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
-  install -Dm644 "${_srcname}/$(make -C ${_srcname} -s image_name)" "$modulesdir/vmlinuz"
+  install -Dm644 "${_srcname}/$(make LOCALVERSION=${_extraver} -C ${_srcname} -s image_name)" "$modulesdir/vmlinuz"
   install -Dm644 "$modulesdir/vmlinuz" "$pkgdir/boot/vmlinuz-$pkgbase"
 
   msg2 "Installing modules..."
-  make -C ${_srcname} INSTALL_MOD_PATH="$pkgdir/usr" modules_install
+  make LOCALVERSION=${_extraver} -C ${_srcname} INSTALL_MOD_PATH="$pkgdir/usr" modules_install
 
   # a place for external modules,
   # with version file for building modules and running depmod from hook
