@@ -1,4 +1,6 @@
+linux
+src
 pkg
 out
-src/linux
-src/version
+*.pkg.tar.xz
+*.install.pkg

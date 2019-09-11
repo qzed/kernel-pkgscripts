@@ -8,17 +8,19 @@ _Note: This is based on the official Arch Linux build files that can be obtained
 
 ### Before you build
 
-- Clone/symlink/checkout your linux source files to `src/linux`.
-  Apply patches/modifications if neccesary, the build process will not change these.
+- Clone/symlink/checkout your linux source files to `./linux`. Apply
+  patches/modifications if neccesary, the build process will not change these.
 
-- Adapt the PKGBUILD to your liking, specifically you might want to adapt the first couple of lines, i.e. `_basever`, `_extraver`, `pkgrel`, and `pkgbase`
-  (those are just for package naming and do not influence the build process at all).
-
-- Adapt the numbers of cores you want to use (`NPROC`) in the Makefile.
+- Configure the PKGBUILD via environment variables. Have a look at the
+  PKGBUILD for details.
 
 ### Building the Kernel
 
-- Run `make`.
-  The final packages should be in `out/` once it's finished.
+Run `./kpkg.py build` to build a package. The final packages should be
+in `out/` once it's finished.
+
+You can specify some options via the `kpkg.py` helper, for example the
+version suffix, e.g. `-lts` by specifying `kpkg.py build -s lts`. You can
+specify the number of cores to use e.g. via `-j8`.
 
 [1]: https://wiki.archlinux.org/index.php/Kernel/Arch_Build_System
