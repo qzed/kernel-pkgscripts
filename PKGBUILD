@@ -6,6 +6,8 @@
 #   - KBUILD_RELEASE        override pkgrel (default: 1)
 #   - KBUILD_HTMLDOCS       build htmldocs (default: n)
 #   - KBUILD_AUTOVER        use kernel versioning as configured in .config (default: n)
+#   - KBUILD_CONFIG         apply specified config file
+#   - KBUILD_CLEAN          optionally clean with specified target before building
 #   - KBUILD_EXTRAVERSION   override kernel EXTRAVERSION
 #   - KBUILD_LOCALVERSION   override kernel LOCALVERSION
 #
@@ -61,11 +63,25 @@ sha256sums=(
 )
 
 prepare() {
+    if test ! -z "${KBUILD_CLEAN}"; then
+        msg2 "Cleaning kernel source using ${KBUILD_CLEAN}"
+        make -C "${_ksrc}" "${_makevers[@]}" ${KBUILD_CLEAN}
+    fi
+
+    if test ! -z "${KBUILD_CONFIG}"; then
+        msg2 "Applying config file '${KBUILD_CONFIG}'"
+        cp "${KBUILD_CONFIG}" "${_ksrc}/.config"
+    fi
+
     if test "${_kautover}" != "y"; then
         msg2 "Overriding version in .config..."
         sed -i "s|CONFIG_LOCALVERSION=.*|CONFIG_LOCALVERSION=\"\"|g" "${_ksrc}/.config"
         sed -i "s|CONFIG_LOCALVERSION_AUTO=.*|CONFIG_LOCALVERSION_AUTO=n|g" "${_ksrc}/.config"
     fi
+
+    msg2 "Configuring..."
+    make -C "${_ksrc}" "${_makevers[@]}" -s oldconfig
+    make -C "${_ksrc}" "${_makevers[@]}" -s prepare
 
     msg2 "Generating kernel version..."
     export _kver=$(make -C "${_ksrc}" "${_makevers[@]}" -s kernelrelease)
