@@ -13,10 +13,11 @@ DIR_BASE = Path(os.path.realpath(__file__)).parent
 DIR_KERNEL_SOURCE = DIR_BASE / "linux"
 
 
-def package_make(suffix, config, clean, htmldocs, cores):
+def package_make(suffix, pkgrel, config, clean, htmldocs, cores):
     env = dict(os.environ)
     env["KBUILD_KERNELSRC"] = DIR_KERNEL_SOURCE
     env["KBUILD_SUFFIX"] = suffix
+    env["KBUILD_RELEASE"] = str(pkgrel)
     env["KBUILD_CONFIG"] = os.path.realpath(config) if config else ''
     env["KBUILD_CLEAN"] = clean
     env["KBUILD_HTMLDOCS"] = 'y' if htmldocs else 'n'
@@ -78,6 +79,7 @@ def main():
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
     p_build.add_argument('--htmldocs', action='store_true')
+    p_build.add_argument('--pkgrel', type=int, default=1)
     p_build.add_argument('-j', type=int, default=multiprocessing.cpu_count())
 
     p_package = subp.add_parser('p')
@@ -91,7 +93,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "build":
-        package_make(args.suffix, args.config, args.clean, args.htmldocs, args.j)
+        package_make(args.suffix, args.pkgrel, args.config, args.clean, args.htmldocs, args.j)
     elif args.command == "p":
         package_cmd(args.subcommand)
     elif args.command == "k":

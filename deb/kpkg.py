@@ -182,7 +182,7 @@ def cmd_build(args):
 
     spec.pkg = types.SimpleNamespace()
     spec.pkg.pkgversion = None
-    spec.pkg.pkgrel = 1
+    spec.pkg.pkgrel = args.pkgrel
     spec.pkg.sourcename = 'linux-surface'
     spec.pkg.changelog_dist = 'unstable'
 
@@ -202,6 +202,7 @@ def main():
     p_build.add_argument('--suffix', '-s', type=str, default='')
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
+    p_build.add_argument('--pkgrel', type=int, default=1)
     p_build.add_argument('-j', type=int, default=None)
 
     args = parser.parse_args()
