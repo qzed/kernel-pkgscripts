@@ -107,6 +107,30 @@ def remote_xfer_packages(connection, dir_out, dir_kernel_src):
         connection.run(f'rm -f \"{dir_remote_out / f}\"')
 
 
+def remote_cleanup(connection, dir_out, dir_kernel_src):
+    dir_remote_out = Path(dir_kernel_src).parent
+
+    cmd = ' '.join([
+        f'cd {dir_remote_out}'
+        '&&'
+        'find .',
+        '-maxdepth 1',
+        '-type f \\( -name "*.dsc" -o -name "*.orig.tar.gz" -o -name "*.diff.gz" \\)',
+    ])
+
+    # get the filenames of the produced files
+    files = connection.run(cmd, hide=True)
+    files = files.stdout.split()
+
+    if files:
+        Path(dir_out).mkdir(parents=True, exist_ok=True)
+
+    # copy files back to host and delete on remote
+    for f in files:
+        print(f'  {Path(f)}')
+        connection.run(f'rm -f \"{dir_remote_out / f}\"')
+
+
 def makepkg(spec):
     # get and start container
     container = get_container(name=spec.container.name)
@@ -161,6 +185,10 @@ def makepkg(spec):
         # move packages to host
         cprint('Moving package files back to host', 'white', attrs=['bold'])
         remote_xfer_packages(con, spec.dir_pkg_out, spec.dir_kernel_src)
+
+        # cleanup
+        cprint('Removing residual package files', 'white', attrs=['bold'])
+        remote_cleanup(con, spec.dir_pkg_out, spec.dir_kernel_src)
 
 
 def cmd_build(args):
