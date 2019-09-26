@@ -107,7 +107,10 @@ def remote_sign_packages(connection, dir_kernel_src, signature):
 
     for f in files:
         print(f'  {Path(f)}')
-        connection.run(f'export GPG_TTY=$(tty) && dpkg-sig --sign builder {key} \"{dir_remote_out / f}\"')
+        gpg_args = "--pinentry-mode loopback"
+        sign_args = f"--sign builder {key}"
+        file = dir_remote_out / f
+        connection.run(f'dpkg-sig -g \"{gpg_args}\" {sign_args} \"{file}\"', pty=True)
 
 
 def remote_xfer_packages(connection, dir_out, dir_kernel_src):
