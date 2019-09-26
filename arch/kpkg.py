@@ -24,7 +24,7 @@ def package_make(suffix, pkgrel, config, clean, htmldocs, cores):
 
     makeflags = "MAKEFLAGS=-j{}".format(cores)
 
-    proc = subprocess.Popen(["makepkg", "-fs", makeflags], cwd=DIR_BASE, env=env)
+    proc = subprocess.Popen(["makepkg", "-fs", "--sign", makeflags], cwd=DIR_BASE, env=env)
     proc.communicate()
 
     if not os.path.exists(DIR_BASE / "out"):
