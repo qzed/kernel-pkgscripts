@@ -6,6 +6,7 @@ import fabric
 import types
 import argparse
 import multiprocessing
+import subprocess
 
 from pathlib import Path
 from termcolor import cprint
@@ -80,6 +81,33 @@ def remote_make_target_full(connection, target, spec):
     ])
 
     connection.run(cmd, pty=True)
+
+
+def remote_sign_packages(connection, dir_kernel_src, signature):
+    if not signature.sign:
+        return
+
+    dir_remote_out = Path(dir_kernel_src).parent
+
+    cmd = ' '.join([
+        f'cd {dir_remote_out}'
+        '&&'
+        'find .',
+        '-maxdepth 1',
+        '-type f \\( -name "*.deb" \\)',
+    ])
+
+    # get the filenames of the produced files
+    files = connection.run(cmd, hide=True)
+    files = files.stdout.split()
+
+    key = ""
+    if signature.key:
+        key = f"-k {signature.key}"
+
+    for f in files:
+        print(f'  {Path(f)}')
+        connection.run(f'export GPG_TTY=$(tty) && dpkg-sig --sign builder {key} \"{dir_remote_out / f}\"')
 
 
 def remote_xfer_packages(connection, dir_out, dir_kernel_src):
@@ -182,9 +210,15 @@ def makepkg(spec):
         remote_make_target_full(con, spec.target, spec)
         print()
 
+        # signing
+        cprint('Signing packages', 'white', attrs=['bold'])
+        remote_sign_packages(con, spec.dir_kernel_src, spec.signature)
+        print()
+
         # move packages to host
         cprint('Moving package files back to host', 'white', attrs=['bold'])
         remote_xfer_packages(con, spec.dir_pkg_out, spec.dir_kernel_src)
+        print()
 
         # cleanup
         cprint('Removing residual package files', 'white', attrs=['bold'])
@@ -218,6 +252,10 @@ def cmd_build(args):
     spec.container.name = 'kdev-deb10'
     spec.container.user = 'build'
 
+    spec.signature = types.SimpleNamespace()
+    spec.signature.sign = args.sign
+    spec.signature.key = args.key
+
     makepkg(spec)
 
 
@@ -232,6 +270,8 @@ def main():
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
     p_build.add_argument('--pkgrel', type=int, default=1)
     p_build.add_argument('-j', type=int, default=None)
+    p_build.add_argument('--sign', action='store_true')
+    p_build.add_argument('--key', type=str, default='')
 
     args = parser.parse_args()
 
