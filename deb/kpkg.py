@@ -234,7 +234,7 @@ def cmd_build(args):
     spec.target = args.target
     spec.nprocs = args.j
 
-    spec.dir_kernel_src = 'devel/linux'
+    spec.dir_kernel_src = 'devel/kernel'
     spec.dir_pkg_out = Path(os.path.realpath(__file__)).parent / 'out'
 
     spec.config = args.config
