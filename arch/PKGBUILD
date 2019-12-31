@@ -50,17 +50,8 @@ makedepends=(
   'python-sphinx_rtd_theme' 'graphviz' 'imagemagick'
 )
 
-source=(
-    '60-linux.hook'
-    '90-linux.hook'
-    'linux.preset'
-)
-
-sha256sums=(
-    'ae2e95db94ef7176207c690224169594d49445e04249d2499e9d2fbc117a0b21'
-    '75f99f5239e03238f88d1a834c50043ec32b1dc568f2cc291b07d04718483919'
-    'ad6344badc91ad0630caacde83f7f9b97276f80d26a20619a87952be65492c65'
-)
+source=()
+sha256sums=()
 
 prepare() {
     if test ! -z "${KBUILD_CLEAN}"; then
@@ -85,6 +76,10 @@ prepare() {
 
     msg2 "Generating kernel version..."
     export _kver=$(make -C "${_ksrc}" "${_makevers[@]}" -s kernelrelease)
+
+    echo "-$pkgrel" > "${srcdir}/localversion.10-pkgrel"
+    echo "${pkgbase#linux}" > "${srcdir}/localversion.20-pkgname"
+    echo "${_kver}" > "${srcdir}/version"
 }
 
 build() {
@@ -100,10 +95,9 @@ build() {
 
 _package() {
     pkgdesc="The ${pkgbase/linux/Linux} kernel and modules"
-    depends=('coreutils' 'linux-firmware' 'kmod' 'mkinitcpio>=0.7')
-    optdepends=('crda: to set the correct wireless channels of your country')
-    backup=("etc/mkinitcpio.d/${pkgbase}.preset")
-    install="linux.install"
+    depends=(coreutils kmod initramfs)
+    optdepends=('crda: to set the correct wireless channels of your country'
+                'linux-firmware: firmware images needed for some devices')
 
     local modulesdir="${pkgdir}/usr/lib/modules/${_kver}"
 
@@ -111,40 +105,15 @@ _package() {
     # systemd expects to find the kernel here to allow hibernation
     # https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
     install -Dm644 "${_ksrc}/$(make -C "${_ksrc}" "${_makevers[@]}" -s image_name)" "${modulesdir}/vmlinuz"
-    install -Dm644 "${modulesdir}/vmlinuz" "${pkgdir}/boot/vmlinuz-${pkgbase}"
+
+    # Used by mkinitcpio to name the kernel
+    echo "${pkgbase}" | install -Dm644 /dev/stdin "${modulesdir}/pkgbase"
 
     msg2 "Installing modules..."
     make -C "${_ksrc}" "${_makevers[@]}" INSTALL_MOD_PATH="${pkgdir}/usr" modules_install
 
-    # a place for external modules,
-    # with version file for building modules and running depmod from hook
-    local extramodules="extramodules${_kname}"
-    local extradir="${pkgdir}/usr/lib/modules/${extramodules}"
-    echo "${_kver}" | install -Dm644 /dev/null "${extradir}/version"
-    ln -sr "${extradir}" "${modulesdir}/extramodules"
-
     # remove build and source links
     rm "${modulesdir}"/{source,build}
-
-    msg2 "Installing hooks..."
-    # sed expression for following substitutions
-    local subst="
-      s|%PKGBASE%|${pkgbase}|g
-      s|%KERNVER%|${kernver}|g
-      s|%EXTRAMODULES%|${extramodules}|g
-    "
-
-    # hack to allow specifying an initially nonexisting install file
-    sed "${subst}" "${startdir}/${install}" > "${startdir}/${install}.pkg"
-    true && install=${install}.pkg
-
-    # fill in mkinitcpio preset and pacman hooks
-    sed "${subst}" "linux.preset" | install -Dm644 /dev/stdin \
-        "${pkgdir}/etc/mkinitcpio.d/${pkgbase}.preset"
-    sed "${subst}" "60-linux.hook" | install -Dm644 /dev/stdin \
-        "${pkgdir}/usr/share/libalpm/hooks/60-${pkgbase}.hook"
-    sed "${subst}" "90-linux.hook" | install -Dm644 /dev/stdin \
-        "${pkgdir}/usr/share/libalpm/hooks/90-${pkgbase}.hook"
 
     msg2 "Fixing permissions..."
     chmod -Rc u=rwX,go=rX "$pkgdir"
@@ -153,12 +122,12 @@ _package() {
 _package-headers() {
     pkgdesc="Header files and scripts for building modules for ${pkgbase/linux/Linux} kernel"
 
+    cd "${_ksrc}"
     local builddir="${pkgdir}/usr/lib/modules/${_kver}/build"
 
-    cd "${_ksrc}"
-
     msg2 "Installing build files..."
-    install -Dt "$builddir" -m644 Makefile .config Module.symvers System.map vmlinux
+    install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map vmlinux
+    install -Dt "$builddir" -m644 "${srcdir}/localversion."* "${srcdir}/version"
     install -Dt "$builddir/kernel" -m644 kernel/Makefile
     install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
     cp -t "$builddir" -a scripts
@@ -169,7 +138,7 @@ _package-headers() {
     # add xfs and shmem for aufs building
     mkdir -p "$builddir"/{fs/xfs,mm}
 
-    # ???
+    # this is gone in v5.3
     mkdir "$builddir/.tmp_versions"
 
     msg2 "Installing headers..."
@@ -225,7 +194,7 @@ _package-headers() {
 
     msg2 "Adding symlink..."
     mkdir -p "$pkgdir/usr/src"
-    ln -sr "$builddir" "$pkgdir/usr/src/$pkgbase-$pkgver"
+    ln -sr "$builddir" "$pkgdir/usr/src/$pkgbase"
 
     msg2 "Fixing permissions..."
     chmod -Rc u=rwX,go=rX "$pkgdir"
@@ -269,7 +238,7 @@ _package-docs() {
 
 # dynamically define package functions
 pkgname=("${pkgbase}" "${pkgbase}-headers" "${pkgbase}-docs")
-for _p in ${pkgname[@]}; do
+for _p in "${pkgname[@]}"; do
     eval "package_${_p}() {
         $(declare -f "_package${_p#${pkgbase}}")
         _package${_p#${pkgbase}}
