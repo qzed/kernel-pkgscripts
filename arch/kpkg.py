@@ -39,7 +39,7 @@ def package_make(spec):
         os.mkdir(spec.dir_base / "out")
 
     for file in os.listdir(spec.dir_base):
-        if file.endswith(".pkg.tar.xz"):
+        if file.endswith(".pkg.tar.xz") or file.endswith(".pkg.tar.zst"):
             shutil.move(str(spec.dir_base / file), str(spec.dir_base / "out" / file))
 
         if file.endswith(".sig"):
