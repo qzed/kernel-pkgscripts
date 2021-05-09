@@ -210,7 +210,7 @@ _package-docs() {
     cp -t "${builddir}" -a "${_ksrc}/Documentation"
 
     msg2 "Removing doctrees..."
-    rm -r "${builddir}/Documentation/output/.doctrees"
+    rm -rf "${builddir}/Documentation/output/.doctrees"
 
     if test "${_khtmldocs}" = "y"; then
         msg2 "Moving HTML docs..."
