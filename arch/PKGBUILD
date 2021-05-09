@@ -10,13 +10,15 @@
 #   - KBUILD_CLEAN          optionally clean with specified target before building
 #   - KBUILD_EXTRAVERSION   override kernel EXTRAVERSION
 #   - KBUILD_LOCALVERSION   override kernel LOCALVERSION
+#   - KBUILD_TOOLCHAIN      toolchain prefix for cross compilation (optional)
+#   - CARCH                 target architecture
 #
 
 
 # names, versions, etc.
 _ksrc=${KBUILD_KERNELSRC:-"${PWD}/linux"}
-_ktag=$(cd ${_ksrc} && git describe --long --tags | sed 's/^v//;s/-.*//')
-_ksfx=$(echo ${KBUILD_SUFFIX} | sed -E 's/(.+)/-\1/')
+_ktag=$(cd "${_ksrc}" && git describe --long --tags | sed 's/^v//;s/-.*//')
+_ksfx=$(echo "${KBUILD_SUFFIX}" | sed -E 's/(.+)/-\1/')
 _krel=${KBUILD_RELEASE:-1}
 _kpkg="linux-surface${_ksfx}"
 _kname="${_kpkg#linux}"
@@ -28,12 +30,30 @@ _khtmldocs="${KBUILD_HTMLDOCS:-n}"
 
 _kautover=${KBUILD_AUTOVER:-n}
 if test "${_kautover}" = "y"; then
-    _makevers=()
+    _makeopts=()
 else
-    _makevers=(
+    _makeopts=(
         "EXTRAVERSION=${_kextraversion}"
         "LOCALVERSION=${_klocalversion}"
     )
+fi
+
+# cross-compilation options
+_ktoolchain=${KBUILD_TOOLCHAIN}
+if test "${CARCH}" = "aarch64"; then
+    _karch="arm64"
+elif test "${CARCH}" = "x86_64"; then
+    _karch="x86"
+else
+    error "Invalid architecture ${CARCH}"
+    exit 1
+fi
+
+_makeopts+=("ARCH=${_karch}")
+if test "${_ktoolchain}" != ""; then
+    export CFLAGS=""
+    export CXXFLAGS=""
+    _makeopts+=("CROSS_COMPILE=${_ktoolchain}")
 fi
 
 
@@ -41,7 +61,7 @@ fi
 pkgbase="${_kpkg}"
 pkgver="${_ktag}"
 pkgrel="${_krel}"
-arch=('x86_64')
+arch=('x86_64' 'aarch64')
 license=('GPL2')
 options=('!strip')
 
@@ -50,13 +70,21 @@ makedepends=(
   'python-sphinx_rtd_theme' 'graphviz' 'imagemagick'
 )
 
-source=()
-sha256sums=()
+source=('linux.preset')
+sha256sums=('5e9a9d7e4e03b5da5e48ba8e5d4035eadc3318c1933343a2f1e0354e35a795ac')
 
 prepare() {
+    if test -z "${_ktoolchain}"; then
+        msg "Building package for ${CARCH} (${_karch}) using default toolchain"
+    else
+        msg "Building package for ${CARCH} (${_karch}) using ${_ktoolchain} toolchain"
+    fi
+
+    msg "Using kernel tree in ${_ksrc}"
+
     if test ! -z "${KBUILD_CLEAN}"; then
         msg2 "Cleaning kernel source using ${KBUILD_CLEAN}"
-        make -C "${_ksrc}" "${_makevers[@]}" ${KBUILD_CLEAN}
+        make -C "${_ksrc}" "${_makeopts[@]}" "${KBUILD_CLEAN}"
     fi
 
     if test ! -z "${KBUILD_CONFIG}"; then
@@ -71,11 +99,11 @@ prepare() {
     fi
 
     msg2 "Configuring..."
-    make -C "${_ksrc}" "${_makevers[@]}" -s oldconfig
-    make -C "${_ksrc}" "${_makevers[@]}" -s prepare
+    make -C "${_ksrc}" "${_makeopts[@]}" -s oldconfig
+    make -C "${_ksrc}" "${_makeopts[@]}" -s prepare
 
     msg2 "Generating kernel version..."
-    export _kver=$(make -C "${_ksrc}" "${_makevers[@]}" -s kernelrelease)
+    export _kver=$(make -C "${_ksrc}"  "${_makeopts[@]}" -s kernelrelease)
 
     echo "-$pkgrel" > "${srcdir}/localversion.10-pkgrel"
     echo "${pkgbase#linux}" > "${srcdir}/localversion.20-pkgname"
@@ -85,12 +113,13 @@ prepare() {
 build() {
     msg2 "Building ${_kpkg} kernel version ${_kver}..."
 
-    targets=(bzImage modules)
+    # target "all" will build bzImage on x86, Image.gz on arm64
+    targets=(all modules)
     if test "${_khtmldocs}" = "y"; then
         targets+=(htmldocs)
     fi
 
-    make -C "${_ksrc}" "${_makevers[@]}" ${targets[@]}
+    make -C "${_ksrc}" "${_makeopts[@]}" "${targets[@]}"
 }
 
 _package() {
@@ -104,16 +133,31 @@ _package() {
     msg2 "Installing boot image..."
     # systemd expects to find the kernel here to allow hibernation
     # https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
-    install -Dm644 "${_ksrc}/$(make -C "${_ksrc}" "${_makevers[@]}" -s image_name)" "${modulesdir}/vmlinuz"
+    install -Dm644 "${_ksrc}/$(make -C "${_ksrc}" "${_makeopts[@]}" -s image_name)" "${modulesdir}/vmlinuz"
 
     # Used by mkinitcpio to name the kernel
     echo "${pkgbase}" | install -Dm644 /dev/stdin "${modulesdir}/pkgbase"
 
     msg2 "Installing modules..."
-    make -C "${_ksrc}" "${_makevers[@]}" INSTALL_MOD_PATH="${pkgdir}/usr" modules_install
+    make -C "${_ksrc}" "${_makeopts[@]}" INSTALL_MOD_PATH="${pkgdir}/usr" modules_install
 
     # remove build and source links
     rm "${modulesdir}"/{source,build}
+
+    if test "${CARCH}" = "aarch64"; then
+        # Arch Linux ARM doesn't support automatic kernel version detection, so
+        # we need to set it in the mkinitcpio preset
+
+        # sed expression for following substitutions
+        local _subst="
+          s|%PKGBASE%|${pkgbase}|g
+          s|%KERNVER%|${_kver}|g
+        "
+
+        msg2 "Installing mkinitcpio preset"
+        sed "${_subst}" ../linux.preset |
+            install -Dm644 /dev/stdin "${pkgdir}/etc/mkinitcpio.d/${pkgbase}.preset"
+    fi
 
     msg2 "Fixing permissions..."
     chmod -Rc u=rwX,go=rX "$pkgdir"
@@ -129,7 +173,7 @@ _package-headers() {
     install -Dt "$builddir" -m644 .config Makefile Module.symvers System.map vmlinux
     install -Dt "$builddir" -m644 "${srcdir}/localversion."* "${srcdir}/version"
     install -Dt "$builddir/kernel" -m644 kernel/Makefile
-    install -Dt "$builddir/arch/x86" -m644 arch/x86/Makefile
+    install -Dt "$builddir/arch/${_karch}" -m644 "arch/${_karch}/Makefile"
     cp -t "$builddir" -a scripts
 
     # add objtool for external module building and enabled VALIDATION_STACK option
@@ -143,8 +187,8 @@ _package-headers() {
 
     msg2 "Installing headers..."
     cp -t "$builddir" -a include
-    cp -t "$builddir/arch/x86" -a arch/x86/include
-    install -Dt "$builddir/arch/x86/kernel" -m644 arch/x86/kernel/asm-offsets.s
+    cp -t "$builddir/arch/${_karch}" -a "arch/${_karch}/include"
+    install -Dt "$builddir/arch/${_karch}/kernel" -m644 "arch/${_karch}/kernel/asm-offsets.s"
 
     install -Dt "$builddir/drivers/md" -m644 drivers/md/*.h
     install -Dt "$builddir/net/mac80211" -m644 net/mac80211/*.h
@@ -163,7 +207,7 @@ _package-headers() {
     msg2 "Removing unneeded architectures..."
     local arch
     for arch in "$builddir"/arch/*/; do
-        [[ $arch = */x86/ ]] && continue
+        [[ $arch = */${_karch}/ ]] && continue
         echo "Removing $(basename "$arch")"
         rm -r "$arch"
     done

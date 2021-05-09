@@ -23,6 +23,10 @@ def package_make(spec):
     env["KBUILD_CLEAN"] = spec.clean
     env["KBUILD_HTMLDOCS"] = 'y' if spec.htmldocs else 'n'
 
+    if spec.target:     # set target and toolchain-prefix for cross-compilation
+        env["KBUILD_TOOLCHAIN"] = f"{spec.target}-linux-gnu-"
+        env["CARCH"] = spec.target
+
     pkgflags = ["-fs"]
     if spec.signature.sign:
         pkgflags += ["--sign"]
@@ -92,6 +96,8 @@ def cmd_build(args):
     spec.clean = args.clean
     spec.htmldocs = args.htmldocs
 
+    spec.target = args.target if args.target else None
+
     spec.dir_kernel_src = DIR_KERNEL_SOURCE
     spec.dir_base = DIR_BASE
 
@@ -115,6 +121,7 @@ def main():
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
     p_build.add_argument('--htmldocs', action='store_true')
+    p_build.add_argument('--target', '-t', type=str, default='')
     p_build.add_argument('--sign', action='store_true')
     p_build.add_argument('--key', type=str, default='')
     p_build.add_argument('--pkgrel', type=int, default=1)
