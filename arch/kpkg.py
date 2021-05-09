@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 DIR_BASE = Path(os.path.realpath(__file__)).parent
-DIR_KERNEL_SOURCE = DIR_BASE / "linux"
+DIR_KERNEL_SOURCE = os.path.realpath(os.getcwd())
 
 
 def package_make(spec):
