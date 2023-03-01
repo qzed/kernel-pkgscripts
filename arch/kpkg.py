@@ -16,6 +16,8 @@ DIR_KERNEL_SOURCE = os.path.realpath(os.getcwd())
 
 def package_make(spec):
     env = dict(os.environ)
+    env["LANGUAGE"] = "C"
+    env["LANG"] = "C"
     env["KBUILD_KERNELSRC"] = spec.dir_kernel_src
     env["KBUILD_SUFFIX"] = spec.kernel_version.suffix
     env["KBUILD_RELEASE"] = str(spec.kernel_version.pkgrel)
