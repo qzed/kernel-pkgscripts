@@ -267,7 +267,7 @@ def main():
     subp = parser.add_subparsers(dest='command')
 
     p_build = subp.add_parser('build')
-    p_build.add_argument('--target', '-t', type=str, default='deb-pkg')
+    p_build.add_argument('--target', '-t', type=str, default='bindeb-pkg')
     p_build.add_argument('--suffix', '-s', type=str, default='')
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
