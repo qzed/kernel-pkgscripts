@@ -1,285 +1,143 @@
 #!/usr/bin/env python3
 
 import os
-import pylxd
-import fabric
-import types
 import argparse
 import multiprocessing
 import subprocess
-
+import shutil
+import types
 from pathlib import Path
-from termcolor import cprint
 
 
-def get_container(client=pylxd.Client(), name='root'):
-    return client.containers.get(name)
+DIR_BASE = Path(os.path.realpath(__file__)).parent
+DIR_KERNEL_SOURCE = Path(os.path.realpath(os.getcwd()))
 
 
-def get_container_ip(container, family='inet'):
-    net = dict(container.state().network)
-    del net['lo']
-
-    for iface, iface_state in net.items():
-        for addr in iface_state['addresses']:
-            if addr['family'] == family and addr['scope'] == 'global':
-                return addr['address']
-
-
-def remote_override_conf(connection, dir_kernel_src):
+def package_make(spec):
+    # disable automatic localversion by editing config
     subst = ';'.join([
         's|CONFIG_LOCALVERSION=.*|CONFIG_LOCALVERSION=\\"\\"|g',
         's|CONFIG_LOCALVERSION_AUTO=.*|CONFIG_LOCALVERSION_AUTO=n|g',
     ])
+    proc = subprocess.run(["sed", "-i", subst, f"{spec.dir_kernel_src}/.config"])
 
-    cmd = f'sed -i "{subst}" "{dir_kernel_src}/.config"'
+    makeflags = ["-j{}".format(spec.nprocs)]
 
-    connection.run(cmd, hide=True)
+    # set up env
+    env = dict(os.environ)
+    env["LANGUAGE"] = "C"
+    env["LANG"] = "C"
+    env["EXTRAVERSION"] = ""
 
+    if spec.kernel_version.suffix:
+        env["LOCALVERSION"] = f"-surface-{spec.kernel_version.suffix}"
+    else:
+        env["LOCALVERSION"] = f"-surface"
 
-def remote_get_nproc(connection):
-    return int(connection.run('nproc', hide=True).stdout.strip())
+    if spec.target:     # set target and toolchain-prefix for cross-compilation
+        env["CROSS_COMPILE"] = f"{spec.target}-linux-gnu-"
+        env["ARCH"] = {
+            "aarch64": "arm64",
+            "x86_64": "x86",
+        }[spec.target]
 
+    # get kernel package version string
+    proc = subprocess.run(["make", "-s"] + makeflags + ["kernelrelease"], cwd=spec.dir_kernel_src,
+                          env=env, capture_output=True)
+    kernelrelease = str(proc.stdout, encoding='utf-8').strip()
 
-def remote_get_kernelrelease(connection, spec):
-    cmd = ' '.join([
-        'make -s',
-        f'-C {spec.dir_kernel_src}',
-        f'-j{spec.nprocs}',
-        f'LOCALVERSION="{spec.kernel_version.local}"',
-        f'EXTRAVERSION="{spec.kernel_version.extra}"',
-        'kernelrelease',
-    ])
+    env["KDEB_PKGVERSION"] = f"{kernelrelease}-{spec.kernel_version.pkgrel}"
 
-    return connection.run(cmd, hide=True).stdout.strip()
+    proc = subprocess.Popen(["make"] + makeflags + [spec.make_target], cwd=spec.dir_kernel_src, env=env)
+    proc.communicate()
 
+    if not os.path.exists(spec.dir_base / "out"):
+        os.mkdir(spec.dir_base / "out")
 
-def remote_make_target(connection, target, spec):
-    cmd = ' '.join([
-        'make',
-        f'-C {spec.dir_kernel_src}',
-        f'-j{spec.nprocs}',
-        f'LOCALVERSION="{spec.kernel_version.local}"',
-        f'EXTRAVERSION="{spec.kernel_version.extra}"',
-        f'{target}',
-    ])
-
-    connection.run(cmd, pty=True)
-
-
-def remote_make_target_full(connection, target, spec):
-    cmd = ' '.join([
-        'make',
-        f'-C {spec.dir_kernel_src}',
-        f'-j{spec.nprocs}',
-        f'LOCALVERSION="{spec.kernel_version.local}"',
-        f'EXTRAVERSION="{spec.kernel_version.extra}"',
-        f'KDEB_PKGVERSION="{spec.pkg.pkgversion}"',
-        f'KDEB_SOURCENAME="{spec.pkg.sourcename}"',
-        f'KDEB_CHANGELOG_DIST="{spec.pkg.changelog_dist}"',
-        f'{target}',
-    ])
-
-    connection.run(cmd, pty=True)
+    for file in os.listdir(spec.dir_kernel_src.parent):
+        if file.endswith(".deb") or file.endswith(".buildinfo") or file.endswith('.changes'):
+            shutil.move(str(spec.dir_kernel_src.parent / file), str(spec.dir_base / "out" / file))
 
 
-def remote_sign_packages(connection, dir_kernel_src, signature):
-    if not signature.sign:
-        return
-
-    dir_remote_out = Path(dir_kernel_src).parent
-
-    cmd = ' '.join([
-        f'cd {dir_remote_out}'
-        '&&'
-        'find .',
-        '-maxdepth 1',
-        '-type f \\( -name "*.deb" \\)',
-    ])
-
-    # get the filenames of the produced files
-    files = connection.run(cmd, hide=True)
-    files = files.stdout.split()
-
-    key = ""
-    if signature.key:
-        key = f"-k {signature.key}"
-
-    for f in files:
-        print(f'  {Path(f)}')
-        gpg_args = "--pinentry-mode loopback"
-        sign_args = f"--sign builder {key}"
-        file = dir_remote_out / f
-        connection.run(f'dpkg-sig -g \"{gpg_args}\" {sign_args} \"{file}\"', pty=True)
+def cmd_package_clean(args):
+    pass
 
 
-def remote_xfer_packages(connection, dir_out, dir_kernel_src):
-    dir_remote_out = Path(dir_kernel_src).parent
-
-    cmd = ' '.join([
-        f'cd {dir_remote_out}'
-        '&&'
-        'find .',
-        '-maxdepth 1',
-        '-type f \\( -name "*.deb" -o -name "*.changes" -o -name "*.buildinfo" \\)',
-    ])
-
-    # get the filenames of the produced files
-    files = connection.run(cmd, hide=True)
-    files = files.stdout.split()
-
-    if files:
-        Path(dir_out).mkdir(parents=True, exist_ok=True)
-
-    # copy files back to host and delete on remote
-    for f in files:
-        print(f'  {Path(f)}')
-        connection.get(dir_remote_out / f, local=dir_out / f)
-        connection.run(f'rm -f \"{dir_remote_out / f}\"')
+def cmd_package_clean_all(args):
+    cmd_package_clean()
+    shutil.rmtree(DIR_BASE / "out", True)
 
 
-def remote_cleanup(connection, dir_out, dir_kernel_src):
-    dir_remote_out = Path(dir_kernel_src).parent
-
-    cmd = ' '.join([
-        f'cd {dir_remote_out}'
-        '&&'
-        'find .',
-        '-maxdepth 1',
-        '-type f \\( -name "*.dsc" -o -name "*.orig.tar.gz" -o -name "*.diff.gz" \\)',
-    ])
-
-    # get the filenames of the produced files
-    files = connection.run(cmd, hide=True)
-    files = files.stdout.split()
-
-    if files:
-        Path(dir_out).mkdir(parents=True, exist_ok=True)
-
-    # copy files back to host and delete on remote
-    for f in files:
-        print(f'  {Path(f)}')
-        connection.run(f'rm -f \"{dir_remote_out / f}\"')
+def cmd_package(args):
+    if args.subcommand == "clean":
+        cmd_package_clean(args)
+    elif args.subcommand == "clean-all":
+        cmd_package_clean_all(args)
 
 
-def makepkg(spec):
-    # get and start container
-    container = get_container(name=spec.container.name)
-    container.start()
-
-    # get container IP
-    container_ip = get_container_ip(container)
-
-    # connect and run build commands
-    with fabric.Connection(host=container_ip, user=spec.container.user) as con:
-        # get number of processors if not set
-        if spec.nprocs is None:
-            spec.nprocs = remote_get_nproc(con)
-
-        # clean
-        if spec.clean:
-            cprint(f'Cleaning kernel source using {spec.clean}', 'white', attrs=['bold'])
-            remote_make_target(con, spec.clean, spec)
-            print()
-
-        # set config
-        if spec.config:
-            cprint(f'Applying config file \'{spec.config}\'', 'white', attrs=['bold'])
-            con.put(local=str(spec.config), remote=str(Path(spec.dir_kernel_src) / '.config'))
-            print()
-
-        # force configuration variables for version
-        if spec.kernel_version.override:
-            cprint(f'Forcing config options for version', 'white', attrs=['bold'])
-            remote_override_conf(con, spec.dir_kernel_src)
-            print()
-
-        # configure
-        cprint('Configuring...', 'white', attrs=['bold'])
-        remote_make_target(con, 'oldconfig', spec)
-        remote_make_target(con, 'prepare', spec)
-        print()
-
-        # compute package version if not specified
-        if spec.pkg.pkgversion is None:
-            cprint(f'Getting kernelrelease version', 'white', attrs=['bold'])
-            krel = remote_get_kernelrelease(con, spec)
-            print(f'  {krel}\n')
-
-            spec.pkg.pkgversion = f'{krel}-{spec.pkg.pkgrel}'
-
-        # build package
-        cprint(f'Building kernel package in {Path(spec.dir_kernel_src)}', 'white', attrs=['bold'])
-        remote_make_target_full(con, spec.target, spec)
-        print()
-
-        # signing
-        cprint('Signing packages', 'white', attrs=['bold'])
-        remote_sign_packages(con, spec.dir_kernel_src, spec.signature)
-        print()
-
-        # move packages to host
-        cprint('Moving package files back to host', 'white', attrs=['bold'])
-        remote_xfer_packages(con, spec.dir_pkg_out, spec.dir_kernel_src)
-        print()
-
-        # cleanup
-        cprint('Removing residual package files', 'white', attrs=['bold'])
-        remote_cleanup(con, spec.dir_pkg_out, spec.dir_kernel_src)
+def cmd_kernel_make(args):
+    proc = subprocess.Popen(["make", "-C", DIR_KERNEL_SOURCE] + args.options, cwd=DIR_BASE)
+    proc.communicate()
 
 
 def cmd_build(args):
     spec = types.SimpleNamespace()
 
-    spec.target = args.target
     spec.nprocs = args.j
-
-    spec.dir_kernel_src = 'devel/kernel'
-    spec.dir_pkg_out = Path(os.path.realpath(__file__)).parent / 'out'
-
     spec.config = args.config
     spec.clean = args.clean
+    spec.htmldocs = args.htmldocs
+
+    spec.target = args.target if args.target else None
+
+    spec.make_target = args.maketarget
+
+    spec.dir_kernel_src = DIR_KERNEL_SOURCE
+    spec.dir_base = DIR_BASE
 
     spec.kernel_version = types.SimpleNamespace()
-    spec.kernel_version.override = True
-    spec.kernel_version.local = f'-surface-{args.suffix}' if args.suffix else '-surface'
-    spec.kernel_version.extra = ''
-
-    spec.pkg = types.SimpleNamespace()
-    spec.pkg.pkgversion = None
-    spec.pkg.pkgrel = args.pkgrel
-    spec.pkg.sourcename = 'linux-surface'
-    spec.pkg.changelog_dist = 'unstable'
-
-    spec.container = types.SimpleNamespace()
-    spec.container.name = 'kdev-deb10'
-    spec.container.user = 'build'
+    spec.kernel_version.suffix = args.suffix
+    spec.kernel_version.pkgrel = args.pkgrel
 
     spec.signature = types.SimpleNamespace()
     spec.signature.sign = args.sign
     spec.signature.key = args.key
 
-    makepkg(spec)
+    package_make(spec)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Debian kernel build helper')
+    parser = argparse.ArgumentParser(description='Debian kernel build helper.')
     subp = parser.add_subparsers(dest='command')
 
     p_build = subp.add_parser('build')
-    p_build.add_argument('--target', '-t', type=str, default='bindeb-pkg')
     p_build.add_argument('--suffix', '-s', type=str, default='')
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
-    p_build.add_argument('--pkgrel', type=int, default=1)
-    p_build.add_argument('-j', type=int, default=None)
+    p_build.add_argument('--htmldocs', action='store_true')
+    p_build.add_argument('--target', '-t', type=str, default='')
+    p_build.add_argument('--maketarget', '-m', type=str, default='bindeb-pkg')
     p_build.add_argument('--sign', action='store_true')
     p_build.add_argument('--key', type=str, default='')
+    p_build.add_argument('--pkgrel', type=int, default=1)
+    p_build.add_argument('-j', type=int, default=multiprocessing.cpu_count())
+
+    p_package = subp.add_parser('p')
+    p_package_subp = p_package.add_subparsers(dest='subcommand')
+    p_package_subp.add_parser('clean')
+    p_package_subp.add_parser('clean-all')
+
+    p_kernel = subp.add_parser('k')
+    p_kernel.add_argument('options', nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
 
-    if args.command == 'build':
+    if args.command == "build":
         cmd_build(args)
+    elif args.command == "p":
+        cmd_package(args)
+    elif args.command == "k":
+        cmd_kernel_make(args)
 
 
 if __name__ == '__main__':
