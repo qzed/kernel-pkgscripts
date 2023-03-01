@@ -1,0 +1,13 @@
+# Based on https://github.com/toolbx-images/images/blob/main/archlinux/Containerfile
+FROM docker.io/library/archlinux:base-devel
+
+LABEL com.github.containers.toolbox="true" \
+      name="archlinux-kernel-toolbox"
+
+# Install packages
+COPY extra-packages /
+RUN pacman -Syu --noconfirm - < extra-packages && pacman -Scc --noconfirm
+RUN rm /extra-packages
+
+# Enable sudo permission for wheel users
+RUN echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/toolbox
