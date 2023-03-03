@@ -25,6 +25,12 @@ def package_make(spec):
     env["KBUILD_CLEAN"] = spec.clean
     env["KBUILD_HTMLDOCS"] = 'y' if spec.htmldocs else 'n'
 
+    if spec.sb.key is not None:
+        env["KBUILD_SB_KEY"] = str(spec.sb.key)
+
+    if spec.sb.cert is not None:
+        env["KBUILD_SB_CERT"] = str(spec.sb.cert)
+
     if spec.target:     # set target and toolchain-prefix for cross-compilation
         env["KBUILD_TOOLCHAIN"] = f"{spec.target}-linux-gnu-"
         env["CARCH"] = spec.target
@@ -111,6 +117,10 @@ def cmd_build(args):
     spec.signature.sign = args.sign
     spec.signature.key = args.key
 
+    spec.sb = types.SimpleNamespace()
+    spec.sb.key = Path(args.sbsign_key).absolute() if args.sbsign_key is not None else None
+    spec.sb.cert = Path(args.sbsign_cert).absolute() if args.sbsign_cert is not None else None
+
     package_make(spec)
 
 
@@ -126,6 +136,8 @@ def main():
     p_build.add_argument('--target', '-t', type=str, default='')
     p_build.add_argument('--sign', action='store_true')
     p_build.add_argument('--key', type=str, default='')
+    p_build.add_argument('--sbsign-key', type=str)
+    p_build.add_argument('--sbsign-cert', type=str)
     p_build.add_argument('--pkgrel', type=int, default=1)
     p_build.add_argument('-j', type=int, default=multiprocessing.cpu_count())
 

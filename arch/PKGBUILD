@@ -11,8 +11,9 @@
 #   - KBUILD_EXTRAVERSION   override kernel EXTRAVERSION
 #   - KBUILD_LOCALVERSION   override kernel LOCALVERSION
 #   - KBUILD_TOOLCHAIN      toolchain prefix for cross compilation (optional)
+#   - KBUILD_SB_KEY         SecureBoot key for signing
+#   - KBUILD_SB_CERT        SecureBoot cert (.crt) for signing
 #   - CARCH                 target architecture
-#
 
 
 # names, versions, etc.
@@ -134,6 +135,12 @@ _package() {
     # systemd expects to find the kernel here to allow hibernation
     # https://github.com/systemd/systemd/commit/edda44605f06a41fb86b7ab8128dcf99161d2344
     install -Dm644 "${_ksrc}/$(make -C "${_ksrc}" "${_makeopts[@]}" -s image_name)" "${modulesdir}/vmlinuz"
+
+    if test ! -z "${KBUILD_SB_KEY}" && test ! -z "${KBUILD_SB_CERT}" ; then
+        msg2 "Siging kernel for secure boot with '${KBUILD_SB_KEY}'"
+        sbsign --key "${KBUILD_SB_KEY}" --cert "${KBUILD_SB_CERT}" --output "${modulesdir}/vmlinuz" \
+            "${modulesdir}/vmlinuz"
+    fi
 
     # Used by mkinitcpio to name the kernel
     echo "${pkgbase}" | install -Dm644 /dev/stdin "${modulesdir}/pkgbase"
