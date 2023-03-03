@@ -3,6 +3,8 @@
 #   - KBUILD_RELEASE        override pkgrel (default: 1)
 #   - KBUILD_SUFFIX         set package and kernel suffix, e.g. 'lts'
 #   - KBUILD_TOOLCHAIN      toolchain prefix for cross compilation (optional)
+#   - KBUILD_SB_KEY         SecureBoot key for signing
+#   - KBUILD_SB_CERT        SecureBoot cert (.crt) for signing
 #
 # Based on https://github.com/linux-surface/linux-surface/blob/master/pkg/fedora/kernel-surface/kernel-surface.spec#L178
 
@@ -10,6 +12,8 @@
 %global kernel_release %{getenv:KBUILD_RELEASE}
 %global kernel_suffix %{getenv:KBUILD_SUFFIX}
 %global kernel_toolchain %{getenv:KBUILD_TOOLCHAIN}
+%global kernel_sb_key %{getenv:KBUILD_SB_KEY}
+%global kernel_sb_cert %{getenv:KBUILD_SB_CERT}
 
 %global fedora_title %{kernel_version}-%{kernel_suffix} (Custom)
 
@@ -151,8 +155,13 @@ mkdir -p %{kernel_modpath}
 
 # Install vmlinuz
 image_name=$(%{kmake} -s image_name)
-install -m 755 $image_name %{buildroot}/boot/vmlinuz-%{kernel_name}
-install -m 755 $image_name %{kernel_modpath}/vmlinuz
+
+if [ ! -z "%{kernel_sb_key}" ] && [ ! -z "%{kernel_sb_cert}" ]; then
+    sbsign --key "%{kernel_sb_key}" --cert "%{kernel_sb_cert}" --output "${image_name}" "${image_name}"
+fi
+
+install -m 755 "${image_name}" "%{buildroot}/boot/vmlinuz-%{kernel_name}"
+install -m 755 "${image_name}" "%{kernel_modpath}/vmlinuz"
 
 # Install System.map and .config
 install -m 644 System.map %{kernel_modpath}/System.map

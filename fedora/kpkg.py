@@ -51,6 +51,12 @@ def package_make(spec):
     env["KBUILD_RELEASE"] = str(spec.kernel_version.pkgrel)
     env["KBUILD_SUFFIX"] = spec.kernel_version.suffix
 
+    if spec.sb.key is not None:
+        env["KBUILD_SB_KEY"] = str(spec.sb.key)
+
+    if spec.sb.cert is not None:
+        env["KBUILD_SB_CERT"] = str(spec.sb.cert)
+
     if spec.target:     # set toolchain for cross-compilation
         env["KBUILD_TOOLCHAIN"] = f"{spec.target}-linux-gnu-"
 
@@ -109,6 +115,10 @@ def cmd_build(args):
     spec.kernel_version.suffix = args.suffix
     spec.kernel_version.pkgrel = args.pkgrel
 
+    spec.sb = types.SimpleNamespace()
+    spec.sb.key = Path(args.sbsign_key).absolute() if args.sbsign_key is not None else None
+    spec.sb.cert = Path(args.sbsign_cert).absolute() if args.sbsign_cert is not None else None
+
     package_make(spec)
 
 
@@ -120,6 +130,8 @@ def main():
     p_build.add_argument('--suffix', '-s', type=str, default='surface')
     p_build.add_argument('--target', '-t', type=str, default='')
     p_build.add_argument('--pkgrel', type=int, default=1)
+    p_build.add_argument('--sbsign-key', type=str)
+    p_build.add_argument('--sbsign-cert', type=str)
     p_build.add_argument('-j', type=int, default=multiprocessing.cpu_count())
 
     p_package = subp.add_parser('p')
