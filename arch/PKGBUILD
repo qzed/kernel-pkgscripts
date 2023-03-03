@@ -184,7 +184,9 @@ _package-headers() {
     cp -t "$builddir" -a scripts
 
     # add objtool for external module building and enabled VALIDATION_STACK option
-    install -Dt "$builddir/tools/objtool" tools/objtool/objtool
+    if [ -f tools/objtool/objtool ]; then
+        install -Dt "$builddir/tools/objtool" tools/objtool/objtool
+    fi
 
     # add xfs and shmem for aufs building
     mkdir -p "$builddir"/{fs/xfs,mm}
