@@ -20,7 +20,7 @@ _ksrc=${KBUILD_KERNELSRC:-"${PWD}/linux"}
 _ktag=$(cd "${_ksrc}" && git describe --long --tags | sed 's/^v//;s/-.*//')
 _ksfx=$(echo "${KBUILD_SUFFIX}" | sed -E 's/(.+)/-\1/')
 _krel=${KBUILD_RELEASE:-1}
-_kpkg="linux-surface${_ksfx}"
+_kpkg="linux${_ksfx}"
 _kname="${_kpkg#linux}"
 
 _kextraversion="${KBUILD_EXTRAVERSION:--${_krel}}"

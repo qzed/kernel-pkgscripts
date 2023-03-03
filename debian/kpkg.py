@@ -28,11 +28,7 @@ def package_make(spec):
     env["LANGUAGE"] = "C"
     env["LANG"] = "C"
     env["EXTRAVERSION"] = ""
-
-    if spec.kernel_version.suffix:
-        env["LOCALVERSION"] = f"-surface-{spec.kernel_version.suffix}"
-    else:
-        env["LOCALVERSION"] = f"-surface"
+    env["LOCALVERSION"] = f"-{spec.kernel_version.suffix}"
 
     if spec.target:     # set target and toolchain-prefix for cross-compilation
         env["CROSS_COMPILE"] = f"{spec.target}-linux-gnu-"
@@ -111,7 +107,7 @@ def main():
     subp = parser.add_subparsers(dest='command')
 
     p_build = subp.add_parser('build')
-    p_build.add_argument('--suffix', '-s', type=str, default='')
+    p_build.add_argument('--suffix', '-s', type=str, default='surface')
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
     p_build.add_argument('--htmldocs', action='store_true')

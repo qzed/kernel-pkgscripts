@@ -119,7 +119,7 @@ def main():
     subp = parser.add_subparsers(dest='command')
 
     p_build = subp.add_parser('build')
-    p_build.add_argument('--suffix', '-s', type=str, default='')
+    p_build.add_argument('--suffix', '-s', type=str, default='surface')
     p_build.add_argument('--config', '-k', type=str, default='')
     p_build.add_argument('--clean', '-c', type=str, nargs='?', default='', const='clean')
     p_build.add_argument('--htmldocs', action='store_true')
