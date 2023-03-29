@@ -72,7 +72,7 @@ makedepends=(
 )
 
 source=('linux.preset')
-sha256sums=('5e9a9d7e4e03b5da5e48ba8e5d4035eadc3318c1933343a2f1e0354e35a795ac')
+sha256sums=('ad6344badc91ad0630caacde83f7f9b97276f80d26a20619a87952be65492c65')
 
 prepare() {
     if test -z "${_ktoolchain}"; then
