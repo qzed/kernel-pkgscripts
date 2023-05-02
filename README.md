@@ -39,7 +39,7 @@ All required dependencies should already be included.
 
 To set up a toolbox, build the container via (for example)
 ```sh
-podman build -t archlinux-kernel-toolbox -f fedora/toolbox/Containerfile
+podman build -t archlinux-kernel-toolbox -f arch/toolbox/Containerfile
 ```
 and create the toolbox 
 ```sh
