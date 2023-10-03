@@ -18,7 +18,7 @@
 
 # names, versions, etc.
 _ksrc=${KBUILD_KERNELSRC:-"${PWD}/linux"}
-_ktag=$(cd "${_ksrc}" && git describe --long --tags | sed 's/^v//;s/-.*//')
+_ktag=$(cd "${_ksrc}" && git describe --long --tags | sed 's/^.*v//;s/-.*//')
 _ksfx=$(echo "${KBUILD_SUFFIX}" | sed -E 's/(.+)/-\1/')
 _krel=${KBUILD_RELEASE:-1}
 _kpkg="linux${_ksfx}"
