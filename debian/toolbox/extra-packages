@@ -51,8 +51,6 @@ bison
 flex
 libssl-dev
 libelf-dev
-python3
 zsh
-exa
 ripgrep
 neovim

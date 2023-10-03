@@ -1,5 +1,5 @@
 # Based on https://github.com/toolbx-images/images/blob/main/debian/11/Containerfile
-FROM docker.io/library/debian:11
+FROM docker.io/library/ubuntu:20.04
 
 LABEL com.github.containers.toolbox="true" \
       name="debian-kernel-toolbox" \
