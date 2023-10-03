@@ -149,7 +149,7 @@ _package() {
     make -C "${_ksrc}" "${_makeopts[@]}" INSTALL_MOD_PATH="${pkgdir}/usr" modules_install
 
     # remove build and source links
-    rm "${modulesdir}"/{source,build}
+    rm -f "${modulesdir}"/{source,build}
 
     if test "${CARCH}" = "aarch64"; then
         # Arch Linux ARM doesn't support automatic kernel version detection, so
