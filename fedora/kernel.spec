@@ -321,8 +321,7 @@ EOF
 # This fixes errors such as
 # *** ERROR: ambiguous python shebang in /usr/bin/kvm_stat: #!/usr/bin/python. Change it to python3 (or python2) explicitly.
 # We patch all sources below for which we got a report/error.
-pathfix.py -i "%{__python3} %{py3_shbang_opts}" -p -n \
-    %{buildroot}/usr/src/kernels/%{kernel_name}/scripts/show_delta
+%py3_shebang_fix %{buildroot}/usr/src/kernels/%{kernel_name}/scripts/show_delta
 
 
 %clean
