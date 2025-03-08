@@ -112,6 +112,7 @@ against the kernel-%{kernel_suffix} package.
 
 
 %prep
+cd %{_top_builddir}
 
 # This Prevents scripts/setlocalversion from mucking with our version numbers.
 touch .scmversion
@@ -129,6 +130,7 @@ sed -i "s|CONFIG_BUILD_SALT=.*|CONFIG_BUILD_SALT=\"%{kernel_name}\"|g" ".config"
 
 
 %build
+cd %{_top_builddir}
 
 # Build the kernel
 %{kmake} all
@@ -141,6 +143,8 @@ sed -i "s|CONFIG_BUILD_SALT=.*|CONFIG_BUILD_SALT=\"%{kernel_name}\"|g" ".config"
 
 
 %install
+cd %{_top_builddir}
+
 mkdir -p %{buildroot}/boot
 mkdir -p %{kernel_modpath}
 
