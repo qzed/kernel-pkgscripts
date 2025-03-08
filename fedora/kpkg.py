@@ -123,7 +123,7 @@ def cmd_build(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Arch-Linux kernel build helper.')
+    parser = argparse.ArgumentParser(description='Fedora kernel build helper.')
     subp = parser.add_subparsers(dest='command')
 
     p_build = subp.add_parser('build')
