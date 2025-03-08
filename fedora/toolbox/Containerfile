@@ -1,9 +1,9 @@
 # Based on https://github.com/containers/toolbox/blob/main/images/fedora/f37/Containerfile
-FROM registry.fedoraproject.org/fedora:40
+FROM registry.fedoraproject.org/fedora:41
 
 LABEL com.github.containers.toolbox="true" \
       name="fedora-kernel-toolbox" \
-      version="40"
+      version="41"
 
 RUN rm /etc/rpm/macros.image-language-conf
 RUN sed -i '/tsflags=nodocs/d' /etc/dnf/dnf.conf
@@ -13,7 +13,7 @@ RUN dnf -y swap coreutils-single coreutils-full
 RUN dnf -y swap glibc-minimal-langpack glibc-all-langpacks
 
 COPY missing-docs /
-RUN dnf -y reinstall $(<missing-docs)
+RUN dnf -y install $(<missing-docs)
 RUN rm /missing-docs
 
 COPY extra-packages /
