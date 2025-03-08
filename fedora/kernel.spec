@@ -209,7 +209,6 @@ if [ -f tools/objtool/objtool ]; then
 
     # these are a few files associated with objtool
     cp -a --parents tools/build/Build.include %{kernel_modpath}/build/
-    cp -a --parents tools/build/Build %{kernel_modpath}/build/
     cp -a --parents tools/build/fixdep.c %{kernel_modpath}/build/
     cp -a --parents tools/scripts/utilities.mak %{kernel_modpath}/build/
 
