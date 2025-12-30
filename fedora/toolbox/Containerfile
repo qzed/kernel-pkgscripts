@@ -1,9 +1,9 @@
 # Based on https://github.com/containers/toolbox/blob/main/images/fedora/f37/Containerfile
-FROM registry.fedoraproject.org/fedora:42
+FROM registry.fedoraproject.org/fedora:43
 
 LABEL com.github.containers.toolbox="true" \
       name="fedora-kernel-toolbox" \
-      version="42"
+      version="43"
 
 RUN rm /etc/rpm/macros.image-language-conf
 RUN sed -i '/tsflags=nodocs/d' /etc/dnf/dnf.conf
