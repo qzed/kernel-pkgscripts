@@ -54,3 +54,8 @@ libelf-dev
 zsh
 ripgrep
 neovim
+rustc
+rust-src
+bindgen
+rustfmt
+rust-clippy
