@@ -152,6 +152,13 @@ _package() {
     rm -f "${modulesdir}"/{source,build}
 
     if test "${CARCH}" = "aarch64"; then
+        msg2 "Installing dtbs..."
+        make -C "${_ksrc}" "${_makeopts[@]}" INSTALL_DTBS_PATH="${modulesdir}/dtb" dtbs_install
+        mkdir -p "${pkgdir}/boot/dtb"
+        cp -r "${modulesdir}/dtb" "${pkgdir}/boot/dtb/${pkgbase}"
+    fi
+
+    if test "${CARCH}" = "aarch64"; then
         # Arch Linux ARM doesn't support automatic kernel version detection, so
         # we need to set it in the mkinitcpio preset
 
